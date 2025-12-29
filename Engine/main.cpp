@@ -25,8 +25,6 @@ double GetCurrentTime()
 
 int main(int argc, char *argv[])
 {
-    //LoadGameCode();
-
     //TODO(Lyubomir): Its Time To Learn LLDB ;D
 
     //bin folder -> lldb app
@@ -123,7 +121,6 @@ int main(int argc, char *argv[])
     {
         dlclose(LibHandle);
     }
-
 
     ShutdownRenderBackend();
 
