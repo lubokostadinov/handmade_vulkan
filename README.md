@@ -1,1 +1,2 @@
-macOS Vulkan 3D graphics engine. TBD.
+macOS Vulkan 3D graphics engine. 
+Work in progress...
