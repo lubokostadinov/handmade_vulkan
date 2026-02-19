@@ -70,6 +70,10 @@ void UpdateModel(model* Model, camera* Camera)
                                      Camera->NearPlane, Camera->FarPlane);
     UniformBuffer.ProjectionMatrix[1][1] *= -1;
 
+    UniformBuffer.LightPosition = glm::vec4(Camera->Position, 0.0f);
+    UniformBuffer.LightColor = glm::vec4(1.0f, 0.9f, 0.8f, 5.0f);
+    UniformBuffer.CameraPosition = glm::vec4(Camera->Position, 0.0f);
+
     memcpy(Model->UniformBuffersMapped[CurrentFrame], &UniformBuffer, sizeof(UniformBuffer));
 }
 
@@ -477,6 +481,11 @@ void InitializeRenderBackend(game_memory* GameMemory)
                 TextureCoordinateData = reinterpret_cast<const float*>(&TextureCoordinateBuffer.data[TextureCoordinateBufferView.byteOffset + TextureCoordinateAccessor.byteOffset]);
             }
 
+            //NOTE(Lyubimir): Access normal
+            const tinygltf::Accessor &NormalAccessor = SponzaGLTFModel.accessors[Primitive.attributes.at("NORMAL")];
+            const tinygltf::BufferView &NormalView   = SponzaGLTFModel.bufferViews[NormalAccessor.bufferView];
+            const float *Normals = reinterpret_cast<const float*>(&SponzaGLTFModel.buffers[NormalView.buffer].data[NormalView.byteOffset + NormalAccessor.byteOffset]);
+
             //NOTE(Lyubimir): Fill vertices
             for (size_t Index = 0; Index < PositionAccessor.count; ++Index)
             {
@@ -485,6 +494,11 @@ void InitializeRenderBackend(game_memory* GameMemory)
                 if (TextureCoordinateData)
                 {
                     Vertices[VertexOffset + Index].TextureCoordinate = glm::vec2(TextureCoordinateData[Index * 2], TextureCoordinateData[Index * 2 + 1]);
+                }
+
+                if(Normals)
+                {
+                    Vertices[VertexOffset + Index].VertexNormal = glm::vec3(Normals[Index * 3], Normals[Index * 3 + 1], Normals[Index * 3 + 2]);
                 }
             }
 
@@ -548,7 +562,7 @@ void InitializeRenderBackend(game_memory* GameMemory)
     BindingDescription.stride = sizeof(vertex);
     BindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-    VkVertexInputAttributeDescription AttributeDescriptions[3] = {};
+    VkVertexInputAttributeDescription AttributeDescriptions[4] = {};
     AttributeDescriptions[0].binding = 0;
     AttributeDescriptions[0].location = 0;
     AttributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
@@ -561,8 +575,13 @@ void InitializeRenderBackend(game_memory* GameMemory)
 
     AttributeDescriptions[2].binding = 0;
     AttributeDescriptions[2].location = 2;
-    AttributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-    AttributeDescriptions[2].offset = offsetof(vertex, TextureCoordinate);
+    AttributeDescriptions[2].format   = VK_FORMAT_R32G32B32_SFLOAT;
+    AttributeDescriptions[2].offset   = offsetof(vertex, VertexNormal);
+
+    AttributeDescriptions[3].binding = 0;
+    AttributeDescriptions[3].location = 3;
+    AttributeDescriptions[3].format   = VK_FORMAT_R32G32_SFLOAT;
+    AttributeDescriptions[3].offset   = offsetof(vertex, TextureCoordinate);
 
     //////////////////////////////////////////////////////////////////////////////////////////
     //NOTE(Lyubomir): Create Vulkan Instance And Setup Validation Layer
@@ -883,7 +902,7 @@ void InitializeRenderBackend(game_memory* GameMemory)
     UniformBufferLayoutBinding.binding = 0;
     UniformBufferLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     UniformBufferLayoutBinding.descriptorCount = 1;
-    UniformBufferLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    UniformBufferLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
     VkDescriptorSetLayoutBinding SamplerLayoutBinding = {};
     SamplerLayoutBinding.binding = 1;
@@ -949,7 +968,7 @@ void InitializeRenderBackend(game_memory* GameMemory)
     VkPipelineVertexInputStateCreateInfo VertexInputInfo = {};
     VertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     VertexInputInfo.vertexBindingDescriptionCount = 1;
-    VertexInputInfo.vertexAttributeDescriptionCount = 3;
+    VertexInputInfo.vertexAttributeDescriptionCount = 4;
     VertexInputInfo.pVertexBindingDescriptions = &BindingDescription;
     VertexInputInfo.pVertexAttributeDescriptions = AttributeDescriptions;
 

@@ -97,6 +97,7 @@ struct vertex
 {
     glm::vec3 VertexPosition;
     glm::vec3 VertexColor;
+    glm::vec3 VertexNormal;
     glm::vec2 TextureCoordinate;
 };
 
@@ -105,6 +106,10 @@ struct uniform_buffer
     glm::mat4 ModelMatrix;
     glm::mat4 ViewMatrix;
     glm::mat4 ProjectionMatrix;
+
+    glm::vec4 LightPosition;
+    glm::vec4 LightColor;
+    glm::vec4 CameraPosition;
 };
 
 uint32 NumVertices = 8;
