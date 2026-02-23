@@ -8,6 +8,21 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "../libs/tiny_gltf.h"
 
+void BeginFrame()
+{
+    RenderBackend.CommandCount = 0;
+}
+
+void PushDraw(model* Model, glm::vec3 Position, glm::vec3 Rotation, glm::vec3 Scale)
+{
+    Assert(RenderBackend.CommandCount < MAX_RENDER_COMMANDS);
+    render_command* Command = &RenderBackend.Commands[RenderBackend.CommandCount++];
+    Command->Model = Model;
+    Command->Position = Position;
+    Command->Rotation = Rotation;
+    Command->Scale = Scale;
+}
+
 buffer_group* GetModelBufferGroup(model_type ModelType)
 {
     //TODO(Lyubomir): What do we want to do here ???
@@ -19,7 +34,8 @@ buffer_group* GetModelBufferGroup(model_type ModelType)
 
             break;
         case CUBE:
-
+            Result->VertexBuffer = &RenderBackend.CubeVertexBuffer;
+            Result->IndexBuffer = &RenderBackend.CubeIndexBuffer;
             break;
         case SUZANNE:
             Result->VertexBuffer = &RenderBackend.VertexBuffer;
@@ -1325,23 +1341,112 @@ void InitializeRenderBackend(game_memory* GameMemory)
     vkFreeMemory(RenderBackend.Device, StagingIndexBufferMemory, nullptr);
 
     //////////////////////////////////////////////////////////////////////////////////////////
+    //NOTE(Lyubomir): Create Cube Buffers
+    vertex CubeVertices[24] =
+    {
+        // Front face (+Z)
+        {glm::vec3(-0.5f,-0.5f, 0.5f), glm::vec3(1,1,1), glm::vec3(0,0,1),  glm::vec2(0,0)},
+        {glm::vec3( 0.5f,-0.5f, 0.5f), glm::vec3(1,1,1), glm::vec3(0,0,1),  glm::vec2(1,0)},
+        {glm::vec3( 0.5f, 0.5f, 0.5f), glm::vec3(1,1,1), glm::vec3(0,0,1),  glm::vec2(1,1)},
+        {glm::vec3(-0.5f, 0.5f, 0.5f), glm::vec3(1,1,1), glm::vec3(0,0,1),  glm::vec2(0,1)},
+        // Back face (-Z)
+        {glm::vec3( 0.5f,-0.5f,-0.5f), glm::vec3(1,1,1), glm::vec3(0,0,-1), glm::vec2(0,0)},
+        {glm::vec3(-0.5f,-0.5f,-0.5f), glm::vec3(1,1,1), glm::vec3(0,0,-1), glm::vec2(1,0)},
+        {glm::vec3(-0.5f, 0.5f,-0.5f), glm::vec3(1,1,1), glm::vec3(0,0,-1), glm::vec2(1,1)},
+        {glm::vec3( 0.5f, 0.5f,-0.5f), glm::vec3(1,1,1), glm::vec3(0,0,-1), glm::vec2(0,1)},
+        // Left face (-X)
+        {glm::vec3(-0.5f,-0.5f,-0.5f), glm::vec3(1,1,1), glm::vec3(-1,0,0), glm::vec2(0,0)},
+        {glm::vec3(-0.5f,-0.5f, 0.5f), glm::vec3(1,1,1), glm::vec3(-1,0,0), glm::vec2(1,0)},
+        {glm::vec3(-0.5f, 0.5f, 0.5f), glm::vec3(1,1,1), glm::vec3(-1,0,0), glm::vec2(1,1)},
+        {glm::vec3(-0.5f, 0.5f,-0.5f), glm::vec3(1,1,1), glm::vec3(-1,0,0), glm::vec2(0,1)},
+        // Right face (+X)
+        {glm::vec3( 0.5f,-0.5f, 0.5f), glm::vec3(1,1,1), glm::vec3(1,0,0),  glm::vec2(0,0)},
+        {glm::vec3( 0.5f,-0.5f,-0.5f), glm::vec3(1,1,1), glm::vec3(1,0,0),  glm::vec2(1,0)},
+        {glm::vec3( 0.5f, 0.5f,-0.5f), glm::vec3(1,1,1), glm::vec3(1,0,0),  glm::vec2(1,1)},
+        {glm::vec3( 0.5f, 0.5f, 0.5f), glm::vec3(1,1,1), glm::vec3(1,0,0),  glm::vec2(0,1)},
+        // Top face (+Y)
+        {glm::vec3(-0.5f, 0.5f, 0.5f), glm::vec3(1,1,1), glm::vec3(0,1,0),  glm::vec2(0,0)},
+        {glm::vec3( 0.5f, 0.5f, 0.5f), glm::vec3(1,1,1), glm::vec3(0,1,0),  glm::vec2(1,0)},
+        {glm::vec3( 0.5f, 0.5f,-0.5f), glm::vec3(1,1,1), glm::vec3(0,1,0),  glm::vec2(1,1)},
+        {glm::vec3(-0.5f, 0.5f,-0.5f), glm::vec3(1,1,1), glm::vec3(0,1,0),  glm::vec2(0,1)},
+        // Bottom face (-Y)
+        {glm::vec3(-0.5f,-0.5f,-0.5f), glm::vec3(1,1,1), glm::vec3(0,-1,0), glm::vec2(0,0)},
+        {glm::vec3( 0.5f,-0.5f,-0.5f), glm::vec3(1,1,1), glm::vec3(0,-1,0), glm::vec2(1,0)},
+        {glm::vec3( 0.5f,-0.5f, 0.5f), glm::vec3(1,1,1), glm::vec3(0,-1,0), glm::vec2(1,1)},
+        {glm::vec3(-0.5f,-0.5f, 0.5f), glm::vec3(1,1,1), glm::vec3(0,-1,0), glm::vec2(0,1)},
+    };
+
+    uint32 CubeIndices[36] =
+    {
+        0, 1, 2,  2, 3, 0,
+        4, 5, 6,  6, 7, 4,
+        8, 9,10, 10,11, 8,
+        12,13,14, 14,15,12,
+        16,17,18, 18,19,16,
+        20,21,22, 22,23,20,
+    };
+
+    VkDeviceSize CubeVertexBufferSize = sizeof(CubeVertices);
+    VkBuffer StagingCubeVertexBuffer;
+    VkDeviceMemory StagingCubeVertexBufferMemory;
+    CreateBuffer(CubeVertexBufferSize,
+                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 StagingCubeVertexBuffer, StagingCubeVertexBufferMemory);
+    void* CubeVertexData;
+    vkMapMemory(RenderBackend.Device, StagingCubeVertexBufferMemory, 0, CubeVertexBufferSize, 0, &CubeVertexData);
+    memcpy(CubeVertexData, CubeVertices, (size_t)CubeVertexBufferSize);
+    vkUnmapMemory(RenderBackend.Device, StagingCubeVertexBufferMemory);
+    CreateBuffer(CubeVertexBufferSize,
+                 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                 RenderBackend.CubeVertexBuffer, RenderBackend.CubeVertexBufferMemory);
+
+    CopyBuffer(StagingCubeVertexBuffer, RenderBackend.CubeVertexBuffer, CubeVertexBufferSize);
+    vkDestroyBuffer(RenderBackend.Device, StagingCubeVertexBuffer, nullptr);
+    vkFreeMemory(RenderBackend.Device, StagingCubeVertexBufferMemory, nullptr);
+
+    VkDeviceSize CubeIndexBufferSize = sizeof(CubeIndices);
+    VkBuffer StagingCubeIndexBuffer;
+    VkDeviceMemory StagingCubeIndexBufferMemory;
+    CreateBuffer(CubeIndexBufferSize,
+                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 StagingCubeIndexBuffer, StagingCubeIndexBufferMemory);
+
+    void* CubeIndexData;
+    vkMapMemory(RenderBackend.Device, StagingCubeIndexBufferMemory, 0, CubeIndexBufferSize, 0, &CubeIndexData);
+    memcpy(CubeIndexData, CubeIndices, (size_t)CubeIndexBufferSize);
+    vkUnmapMemory(RenderBackend.Device, StagingCubeIndexBufferMemory);
+    CreateBuffer(CubeIndexBufferSize,
+                 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                 RenderBackend.CubeIndexBuffer, RenderBackend.CubeIndexBufferMemory);
+
+    CopyBuffer(StagingCubeIndexBuffer, RenderBackend.CubeIndexBuffer, CubeIndexBufferSize);
+    vkDestroyBuffer(RenderBackend.Device, StagingCubeIndexBuffer, nullptr);
+    vkFreeMemory(RenderBackend.Device, StagingCubeIndexBufferMemory, nullptr);
+
+    //////////////////////////////////////////////////////////////////////////////////////////
     //NOTE(Lyubomir): Create Uniform Buffers
     RenderBackend.SponzaModel = CreateModel(&RenderBackend.GraphicsArena, SUZANNE, glm::vec3(0.0f, 0.0f, -10.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.2f, 0.2f, 0.2f));
+    RenderBackend.SponzaModel->Segments = RenderBackend.SponzaSegments;
 
     //////////////////////////////////////////////////////////////////////////////////////////
     //NOTE(Lyubomir): Create Descriptor Pool
+    model* SponzaModel = RenderBackend.SponzaModel;
     VkDescriptorPoolSize DescriptorPoolSize[2] = {};
     DescriptorPoolSize[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    DescriptorPoolSize[0].descriptorCount = static_cast<uint32>(MAX_FRAMES_IN_FLIGHT * RenderBackend.SponzaSegments.size() + MAX_FRAMES_IN_FLIGHT * 2);
+    DescriptorPoolSize[0].descriptorCount = static_cast<uint32>(MAX_FRAMES_IN_FLIGHT * SponzaModel->Segments.size() + MAX_FRAMES_IN_FLIGHT * 2);
     DescriptorPoolSize[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    DescriptorPoolSize[1].descriptorCount = static_cast<uint32>(MAX_FRAMES_IN_FLIGHT * RenderBackend.SponzaSegments.size() + MAX_FRAMES_IN_FLIGHT * 2);
+    DescriptorPoolSize[1].descriptorCount = static_cast<uint32>(MAX_FRAMES_IN_FLIGHT * SponzaModel->Segments.size() + MAX_FRAMES_IN_FLIGHT * 2);
 
     VkDescriptorPoolCreateInfo DescriptorPoolInfo = {};
     DescriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     DescriptorPoolInfo.poolSizeCount = ArrayCount(DescriptorPoolSize);
     DescriptorPoolInfo.pPoolSizes = DescriptorPoolSize;
     //TODO(Lyubomir): Dynamic Binding for uniform buffers so we can reuse 1 descriptor set layout for many uniform buffers?
-    DescriptorPoolInfo.maxSets = static_cast<uint32>(MAX_FRAMES_IN_FLIGHT * RenderBackend.SponzaSegments.size() + MAX_FRAMES_IN_FLIGHT * 2);
+    DescriptorPoolInfo.maxSets = static_cast<uint32>(MAX_FRAMES_IN_FLIGHT * SponzaModel->Segments.size() + MAX_FRAMES_IN_FLIGHT * 2);
 
     if (vkCreateDescriptorPool(RenderBackend.Device, &DescriptorPoolInfo, nullptr, &RenderBackend.DescriptorPool) != VK_SUCCESS)
     {
@@ -1350,39 +1455,30 @@ void InitializeRenderBackend(game_memory* GameMemory)
 
     //////////////////////////////////////////////////////////////////////////////////////////
     //NOTE(Lyubomir): Create Descriptor Sets
-    RenderBackend.SponzaModel->DescriptorSetLayouts.resize(MAX_FRAMES_IN_FLIGHT);
-    for(int32 Index = 0; Index < MAX_FRAMES_IN_FLIGHT; ++Index)
-    {
-        RenderBackend.SponzaModel->DescriptorSetLayouts[Index] = RenderBackend.DescriptorSetLayout;
-    }
-
-    model* SponzaModel = RenderBackend.SponzaModel;
-    CreateDescriptorSets(&RenderBackend, &SponzaModel->DescriptorSetLayouts, &SponzaModel->DescriptorSets, &RenderBackend.DescriptorPool, &SponzaModel->UniformBuffers);
-
-    RenderBackend.SegmentDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+    SponzaModel->DescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
     for (uint32 Frame = 0; Frame < MAX_FRAMES_IN_FLIGHT; ++Frame)
     {
-        RenderBackend.SegmentDescriptorSets[Frame].resize(RenderBackend.SponzaSegments.size());
-        std::vector<VkDescriptorSetLayout> Layouts(RenderBackend.SponzaSegments.size(), RenderBackend.DescriptorSetLayout);
+        SponzaModel->DescriptorSets[Frame].resize(SponzaModel->Segments.size());
+        std::vector<VkDescriptorSetLayout> Layouts(SponzaModel->Segments.size(), RenderBackend.DescriptorSetLayout);
         VkDescriptorSetAllocateInfo AllocInfo = {};
         AllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         AllocInfo.descriptorPool = RenderBackend.DescriptorPool;
         AllocInfo.descriptorSetCount = (uint32)Layouts.size();
         AllocInfo.pSetLayouts = Layouts.data();
 
-        VkResult Result = vkAllocateDescriptorSets(RenderBackend.Device, &AllocInfo, RenderBackend.SegmentDescriptorSets[Frame].data());
+        VkResult Result = vkAllocateDescriptorSets(RenderBackend.Device, &AllocInfo, SponzaModel->DescriptorSets[Frame].data());
         if (Result != VK_SUCCESS)
         {
             printf("Failed to allocate Sponza segment descriptor sets!\n");
         }
 
-        for (uint32 Segment = 0; Segment < RenderBackend.SponzaSegments.size(); ++Segment)
+        for (uint32 Segment = 0; Segment < SponzaModel->Segments.size(); ++Segment)
         {
-            mesh_primitive& MeshPrimitive = RenderBackend.SponzaSegments[Segment];
+            mesh_primitive& MeshPrimitive = SponzaModel->Segments[Segment];
             int32 ImageIndex = MeshPrimitive.TextureIndex;
 
             VkDescriptorBufferInfo BufferInfo = {};
-            BufferInfo.buffer = RenderBackend.SponzaModel->UniformBuffers[Frame];
+            BufferInfo.buffer = SponzaModel->UniformBuffers[Frame];
             BufferInfo.offset = 0;
             BufferInfo.range = sizeof(uniform_buffer);
 
@@ -1394,14 +1490,14 @@ void InitializeRenderBackend(game_memory* GameMemory)
             VkWriteDescriptorSet DescWrites[2] = {};
             //NOTE(Lyubomir): UBO
             DescWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            DescWrites[0].dstSet = RenderBackend.SegmentDescriptorSets[Frame][Segment];
+            DescWrites[0].dstSet = SponzaModel->DescriptorSets[Frame][Segment];
             DescWrites[0].dstBinding = 0;
             DescWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
             DescWrites[0].descriptorCount = 1;
             DescWrites[0].pBufferInfo = &BufferInfo;
             //NOTE(Lyubomir): Sampler
             DescWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            DescWrites[1].dstSet = RenderBackend.SegmentDescriptorSets[Frame][Segment];
+            DescWrites[1].dstSet = SponzaModel->DescriptorSets[Frame][Segment];
             DescWrites[1].dstBinding = 1;
             DescWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             DescWrites[1].descriptorCount = 1;
@@ -1409,6 +1505,64 @@ void InitializeRenderBackend(game_memory* GameMemory)
 
             vkUpdateDescriptorSets(RenderBackend.Device, 2, DescWrites, 0, nullptr);
         }
+    }
+
+    //////////////////////////////////////////////////////////////////////////////////////////
+    //NOTE(Lyubomir): Create Cube Model
+    RenderBackend.CubeModel = CreateModel(&RenderBackend.GraphicsArena, CUBE,
+                                          glm::vec3(5.0f, 0.0f, 0.0f),
+                                          glm::vec3(0.0f),
+                                          glm::vec3(1.0f));
+
+    mesh_primitive CubePrimitive = {};
+    CubePrimitive.IndexOffset  = 0;
+    CubePrimitive.IndexCount   = 36;
+    CubePrimitive.VertexOffset = 0;
+    CubePrimitive.VertexCount  = 24;
+    CubePrimitive.MaterialIndex = -1;
+    CubePrimitive.TextureIndex  = 0;
+    RenderBackend.CubeModel->Segments.push_back(CubePrimitive);
+
+    RenderBackend.CubeModel->DescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+    for (uint32 Frame = 0; Frame < MAX_FRAMES_IN_FLIGHT; ++Frame)
+    {
+        RenderBackend.CubeModel->DescriptorSets[Frame].resize(1);
+        VkDescriptorSetLayout CubeLayout = RenderBackend.DescriptorSetLayout;
+        VkDescriptorSetAllocateInfo CubeAllocInfo = {};
+        CubeAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        CubeAllocInfo.descriptorPool = RenderBackend.DescriptorPool;
+        CubeAllocInfo.descriptorSetCount = 1;
+        CubeAllocInfo.pSetLayouts = &CubeLayout;
+        if (vkAllocateDescriptorSets(RenderBackend.Device, &CubeAllocInfo,
+                                     &RenderBackend.CubeModel->DescriptorSets[Frame][0]) != VK_SUCCESS)
+        {
+            printf("Failed to allocate cube descriptor sets!\n");
+        }
+
+        VkDescriptorBufferInfo CubeBufferInfo = {};
+        CubeBufferInfo.buffer = RenderBackend.CubeModel->UniformBuffers[Frame];
+        CubeBufferInfo.offset = 0;
+        CubeBufferInfo.range  = sizeof(uniform_buffer);
+
+        VkDescriptorImageInfo CubeImageInfo = {};
+        CubeImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        CubeImageInfo.imageView   = SponzaTextures[0].View;
+        CubeImageInfo.sampler     = SponzaTextures[0].Sampler;
+
+        VkWriteDescriptorSet CubeDescWrites[2] = {};
+        CubeDescWrites[0].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        CubeDescWrites[0].dstSet          = RenderBackend.CubeModel->DescriptorSets[Frame][0];
+        CubeDescWrites[0].dstBinding      = 0;
+        CubeDescWrites[0].descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        CubeDescWrites[0].descriptorCount = 1;
+        CubeDescWrites[0].pBufferInfo     = &CubeBufferInfo;
+        CubeDescWrites[1].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        CubeDescWrites[1].dstSet          = RenderBackend.CubeModel->DescriptorSets[Frame][0];
+        CubeDescWrites[1].dstBinding      = 1;
+        CubeDescWrites[1].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        CubeDescWrites[1].descriptorCount = 1;
+        CubeDescWrites[1].pImageInfo      = &CubeImageInfo;
+        vkUpdateDescriptorSets(RenderBackend.Device, 2, CubeDescWrites, 0, nullptr);
     }
 
     //////////////////////////////////////////////////////////////////////////////////////////
@@ -1544,11 +1698,6 @@ void Render(game_memory* GameMemory)
     vkAcquireNextImageKHR(RenderBackend.Device, RenderBackend.SwapChain, UINT64_MAX, RenderBackend.ImageAvailableSemaphores[CurrentFrame], 0, &ImageIndex);
 
     //////////////////////////////////////////////////////////////////////////////////////////
-    //NOTE(Lyubomir): Update Uniform Buffers
-
-    UpdateModel(RenderBackend.SponzaModel, RenderBackend.Camera);
-
-    //////////////////////////////////////////////////////////////////////////////////////////
     //NOTE(Lyubomir): Reset Fences And Command Buffer
 
     vkResetFences(RenderBackend.Device, 1, &RenderBackend.InFlightFences[CurrentFrame]);
@@ -1614,24 +1763,37 @@ void Render(game_memory* GameMemory)
 
     vkCmdBindIndexBuffer(RenderBackend.CommandBuffers[CurrentFrame], RenderBackend.IndexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-    for (uint32 Segment = 0; Segment < RenderBackend.SponzaSegments.size(); ++Segment)
+    for (uint32 CmdIndex = 0; CmdIndex < RenderBackend.CommandCount; CmdIndex++)
     {
-        mesh_primitive& Primitive = RenderBackend.SponzaSegments[Segment];
+        render_command* Cmd = &RenderBackend.Commands[CmdIndex];
+        model* Model = Cmd->Model;
 
-        vkCmdBindDescriptorSets(RenderBackend.CommandBuffers[CurrentFrame],
-                                VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                RenderBackend.PipelineLayout,
-                                0, 1,
-                                &RenderBackend.SegmentDescriptorSets[CurrentFrame][Segment],
-                                0, nullptr);
+        Model->Position = Cmd->Position;
+        Model->Rotation = Cmd->Rotation;
+        Model->Scale    = Cmd->Scale;
 
-        vkCmdDrawIndexed(RenderBackend.CommandBuffers[CurrentFrame],
-                         Primitive.IndexCount,
-                         1,
-                         Primitive.IndexOffset,
-                         0,
-                         0);
+        UpdateModel(Model, RenderBackend.Camera);
+
+        VkBuffer ModelVertexBuffers[] = {*Model->ModelBuffers->VertexBuffer};
+        VkDeviceSize ModelOffsets[] = {0};
+        vkCmdBindVertexBuffers(RenderBackend.CommandBuffers[CurrentFrame], 0, 1, ModelVertexBuffers, ModelOffsets);
+        vkCmdBindIndexBuffer(RenderBackend.CommandBuffers[CurrentFrame], *Model->ModelBuffers->IndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+        for (uint32 Seg = 0; Seg < Model->Segments.size(); Seg++)
+        {
+            mesh_primitive& Primitive = Model->Segments[Seg];
+
+            vkCmdBindDescriptorSets(RenderBackend.CommandBuffers[CurrentFrame], VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                    RenderBackend.PipelineLayout,
+                                    0, 1,
+                                    &Model->DescriptorSets[CurrentFrame][Seg],
+                                    0, nullptr);
+
+            vkCmdDrawIndexed(RenderBackend.CommandBuffers[CurrentFrame], Primitive.IndexCount, 1,
+                             Primitive.IndexOffset, 0, 0);
+        }
     }
+
 
     vkCmdEndRenderPass(RenderBackend.CommandBuffers[CurrentFrame]);
 
@@ -1749,6 +1911,7 @@ void ShutdownRenderBackend()
         PFN_vkDestroyDebugUtilsMessengerEXT DestroyDebugUtilsMessengerEXT =
             (PFN_vkDestroyDebugUtilsMessengerEXT) vkGetInstanceProcAddr(RenderBackend.Instance, "vkDestroyDebugUtilsMessengerEXT");
         if (DestroyDebugUtilsMessengerEXT != nullptr)
+
         {
             DestroyDebugUtilsMessengerEXT(RenderBackend.Instance, RenderBackend.DebugMessenger, nullptr);
         }

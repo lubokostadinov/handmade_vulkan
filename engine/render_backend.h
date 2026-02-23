@@ -17,6 +17,7 @@
 #include <vector>
 //TODO(Lyubomir): Stay away from STD!
 
+#define MAX_RENDER_COMMANDS 1024
 #define MAX_FRAMES_IN_FLIGHT 2
 uint32 CurrentFrame = 0;
 
@@ -42,6 +43,16 @@ struct texture
     VkSampler Sampler;
 };
 
+struct mesh_primitive
+{
+    size_t IndexOffset;
+    size_t IndexCount;
+    size_t VertexOffset;
+    size_t VertexCount;
+    int32 MaterialIndex;
+    int32 TextureIndex;
+};
+
 enum model_type
 {
     TRIANGLE,
@@ -60,12 +71,13 @@ struct model
     model_type ModelType;
     buffer_group* ModelBuffers;
 
+    std::vector<mesh_primitive> Segments;
+
     std::vector<VkBuffer> UniformBuffers;
     std::vector<VkDeviceMemory> UniformBuffersMemory;
     std::vector<void*> UniformBuffersMapped;
 
-    std::vector<VkDescriptorSet> DescriptorSets;
-    std::vector<VkDescriptorSetLayout> DescriptorSetLayouts;
+    std::vector<std::vector<VkDescriptorSet>> DescriptorSets;
 };
 
 struct camera
@@ -81,16 +93,6 @@ struct camera
     float Yaw;
     float Pitch;
     float Sensitivity;
-};
-
-struct mesh_primitive
-{
-    size_t IndexOffset;
-    size_t IndexCount;
-    size_t VertexOffset;
-    size_t VertexCount;
-    int32 MaterialIndex;
-    int32 TextureIndex;
 };
 
 struct vertex
@@ -112,12 +114,21 @@ struct uniform_buffer
     glm::vec4 CameraPosition;
 };
 
+struct render_command
+{
+    model* Model;
+    glm::vec3 Position;
+    glm::vec3 Rotation;
+    glm::vec3 Scale;
+};
+
 uint32 NumVertices = 8;
 uint32 NumIndices = 36;
 
 struct render_backend
 {
-    std::vector<mesh_primitive> SponzaSegments;
+    render_command Commands[MAX_RENDER_COMMANDS];
+    uint32 CommandCount;
 
     VkInstance Instance;
     VkPhysicalDevice PhysicalDevice;
@@ -165,8 +176,15 @@ struct render_backend
 
     buffer_group* BufferGroups[MAX_MODEL_TYPE];
 
+    VkBuffer CubeVertexBuffer;
+    VkDeviceMemory CubeVertexBufferMemory;
+    VkBuffer CubeIndexBuffer;
+    VkDeviceMemory CubeIndexBufferMemory;
+
     memory_arena GraphicsArena;
     model* SponzaModel;
+    model* CubeModel;
+    std::vector<mesh_primitive> SponzaSegments;
 
     camera* Camera;
     float DeltaTime;
@@ -211,6 +229,10 @@ void CreateDescriptorSets(render_backend* RenderBackend,
                           std::vector<VkDescriptorSet>* DescriptorSets,
                           VkDescriptorPool* DescriptorPool,
                           std::vector<VkBuffer>* UniformBuffers);
+
+void BeginFrame();
+
+void PushDraw(model* Model, glm::vec3 Position, glm::vec3 Rotation, glm::vec3 Scale);
 
 void InitializeRenderBackend(game_memory* GameMemory);
 
