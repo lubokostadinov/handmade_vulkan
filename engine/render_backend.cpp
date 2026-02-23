@@ -86,8 +86,15 @@ void UpdateModel(model* Model, camera* Camera)
                                      Camera->NearPlane, Camera->FarPlane);
     UniformBuffer.ProjectionMatrix[1][1] *= -1;
 
-    UniformBuffer.LightPosition = glm::vec4(Camera->Position, 0.0f);
-    UniformBuffer.LightColor = glm::vec4(1.0f, 0.9f, 0.8f, 5.0f);
+    //NOTE(Lyubomir): Lantern - held slightly in front, below, and to the right of the camera
+    RenderBackend.ElapsedTime += RenderBackend.DeltaTime;
+    glm::vec3 LanternPos = Camera->Position
+                         + Camera->Front * 0.5f
+                         - Camera->Up    * 0.4f
+                         + Camera->Right * 0.2f;
+
+    UniformBuffer.LightPosition = glm::vec4(LanternPos, RenderBackend.ElapsedTime);
+    UniformBuffer.LightColor = glm::vec4(1.0f, 0.6f, 0.15f, 8.0f);
     UniformBuffer.CameraPosition = glm::vec4(Camera->Position, 0.0f);
 
     memcpy(Model->UniformBuffersMapped[CurrentFrame], &UniformBuffer, sizeof(UniformBuffer));

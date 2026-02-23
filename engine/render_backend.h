@@ -188,6 +188,7 @@ struct render_backend
 
     camera* Camera;
     float DeltaTime;
+    float ElapsedTime;
 } RenderBackend;
 
 buffer_group* GetModelBufferGroup(model_type ModelType);

@@ -116,14 +116,16 @@ int main(int argc, char *argv[])
         PollEvents();
 
         BeginFrame();
+
         PushDraw(RenderBackend.SponzaModel,
                  glm::vec3(0.0f, 0.0f, -10.0f),
                  glm::vec3(0.0f),
                  glm::vec3(0.2f, 0.2f, 0.2f));
+
         PushDraw(RenderBackend.CubeModel,
-                 glm::vec3(5.0f, 0.0f, 0.0f),
+                 glm::vec3(0.0f, 5.0f, 0.0f),
                  glm::vec3(0.0f),
-                 glm::vec3(1.0f, 1.0f, 1.0f));
+                 glm::vec3(10.0f, 10.0f, 10.0f));
 
         Render(&GameMemory);
     }
