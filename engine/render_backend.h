@@ -93,6 +93,10 @@ struct camera
     float Yaw;
     float Pitch;
     float Sensitivity;
+
+    bool32 DrawProjectile;
+    bool32 ShootPressed;
+    glm::vec3 ProjectilePosition;
 };
 
 struct vertex
@@ -189,6 +193,7 @@ struct render_backend
     camera* Camera;
     float DeltaTime;
     float ElapsedTime;
+
 } RenderBackend;
 
 buffer_group* GetModelBufferGroup(model_type ModelType);

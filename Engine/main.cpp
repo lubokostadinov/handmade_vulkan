@@ -127,6 +127,18 @@ int main(int argc, char *argv[])
                  glm::vec3(0.0f),
                  glm::vec3(10.0f, 10.0f, 10.0f));
 
+
+        if(RenderBackend.Camera->DrawProjectile)
+        {
+            glm::vec3 Velocity = RenderBackend.Camera->Front * 100.f;
+            RenderBackend.Camera->ProjectilePosition += Velocity * RenderBackend.DeltaTime;
+
+            PushDraw(RenderBackend.CubeModel,
+                     RenderBackend.Camera->ProjectilePosition,
+                     glm::vec3(0.0f),
+                     glm::vec3(5.0f, 5.0f, 5.0f));
+        }
+
         Render(&GameMemory);
     }
     if (LibHandle)

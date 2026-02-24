@@ -1667,6 +1667,8 @@ void UpdateCamera(camera *Camera)
 
     float Speed = 18.0f;
 
+    Camera->ShootPressed = false;
+
     if(WPressed > -1)
     {
         Camera->Position += Camera->Front * (Speed * RenderBackend.DeltaTime);
@@ -1686,6 +1688,10 @@ void UpdateCamera(camera *Camera)
     if(SpacePressed > -1)
     {
         Camera->Position += Camera->Up * (Speed * RenderBackend.DeltaTime);
+
+        Camera->ShootPressed = true;
+        Camera->ProjectilePosition = Camera->Position;
+        Camera->DrawProjectile = true;
     }
     if(ShiftPressed > -1)
     {
